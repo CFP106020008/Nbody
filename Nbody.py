@@ -1,25 +1,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from constants import *
+import init
 
 # Let's use MKS
 N = int(1e1) # Number of Shells
-rho = 0.01 # Density of the medium
-R = 1
-T = 10
-G = 6.67e-11
+T = 86400*500
 
 D = np.zeros((7, N))
-D[0:3,:] = np.random.random((3,N)) # Linear separation shells
-D[3:6,:] = np.random.random((3,N)) # Linear separation shells
-D[6,:] = 1 # Mass of each particle
+D = init.Circular_motion(D, 1.5e11, 6e24)
 
 def Acc(D):
-    print(D[0:3,:])
     a = np.zeros((3, N))
     for i in range(N):
-        r = D[0:3,:] - D[0:3,i]*np.ones((3, N))
-        a[i,:] = np.sum(-G*D[7,:]*D[7,i]/np.linalg.norm(r)**3*r, axis=1)
+        a_ij = np.ones(N)
+        M = D[6,:]
+        r_ij = D[0:3,:] - np.outer(D[0:3,i], np.ones(N))
+        r_ij[:,i] = 1 # To avoid divided by 0
+        a_ij = G*M/np.linalg.norm(r_ij, axis=0)**3*r_ij
+        a_ij[:,i] = 0
+        a_i = np.sum(a_ij, axis=1)
+        a[:,i] = a_i
     return a
 
 def function(t, y):
@@ -28,7 +30,8 @@ def function(t, y):
     v = y[3:6,:]
     #D[0:3,:] = r
     #D[3:6,:] = v
-    dfdt = np.concatenate(v, Acc(y), axis=0)
+    M = D[6,:]
+    dfdt = np.row_stack((np.concatenate((v, Acc(y)), axis=0),M)).flatten()
     #dxdt = v
     #dvdt = Acc(D)
     return dfdt
@@ -41,16 +44,14 @@ sol = solve_ivp(fun = function,
                 )
 
 print(np.shape(sol.y))
-#x = sol.y[0,:]
-#y = sol.y[1,:]
-#z = sol.y[2,:]
-#V = sol.y[N:]
-#t = sol.t
-
-#for i in range(N):
-#    plt.plot(t, np.abs(R[i,:]))
+SOL = np.ones((7, N, np.shape(sol.y)[1]))
+for i in range(np.shape(sol.y)[1]):
+    SOL[:,:,i] = sol.y[:,i].reshape((7,N))
+#SOL.reshape((7, 10, np.shape(sol.y)[1]))
+for i in range(N):
+    plt.plot(SOL[0,i,:], SOL[1,i,:])
 #plt.ylim([0,1])
 #plt.xlabel("Time")
 #plt.ylabel("R")
 #plt.savefig("./Result.png", dpi=300)
-#plt.show()
+plt.show()
